@@ -25,86 +25,162 @@ int parse_line(char line[], int arr[], int max) {
     return count;
 }
 
-void read_text_files() {
+void read_text_files(int walls[MAX_ROWS][MAX_COLS], int stairs[MAX_ROWS][MAX_COLS], int poles[MAX_ROWS][MAX_COLS], int flag[MAX_COLS], int *seed ) 
+{
     FILE *f;
     char line[MAX_LINE];
-    int i, j;
+    int rows;
 
-    //Walls
-    int walls[MAX_ROWS][MAX_COLS];
-    int walls_sizes[MAX_ROWS];
-    int walls_rows = 0;
-
+    // --- Walls ---
+    rows = 0;
     f = fopen("walls.txt", "r");
     if (!f) { perror("walls.txt"); exit(1); }
     while (fgets(line, sizeof(line), f)) {
-        if (line[0] == '#') continue; // skip comment lines
-        walls_sizes[walls_rows] = parse_line(line, walls[walls_rows], MAX_COLS);
-        walls_rows++;
-        if (walls_rows >= MAX_ROWS) break;
+        if (line[0] == '#') continue;
+        parse_line(line, walls[rows], MAX_COLS);
+        rows++;
+        if (rows >= MAX_ROWS) break;
     }
     fclose(f);
 
-    //Stairs
-    int stairs[MAX_ROWS][MAX_COLS];
-    int stairs_sizes[MAX_ROWS];
-    int stairs_rows = 0;
-
+    // --- Stairs ---
+    rows = 0;
     f = fopen("stairs.txt", "r");
     if (!f) { perror("stairs.txt"); exit(1); }
     while (fgets(line, sizeof(line), f)) {
-        if (line[0] == '#') continue; // skip comment lines
-        stairs_sizes[stairs_rows] = parse_line(line, stairs[stairs_rows], MAX_COLS);
-        stairs_rows++;
-        if (stairs_rows >= MAX_ROWS) break;
+        if (line[0] == '#') continue;
+        parse_line(line, stairs[rows], MAX_COLS);
+        rows++;
+        if (rows >= MAX_ROWS) break;
     }
     fclose(f);
 
-    //Poles
-    int poles[MAX_ROWS][MAX_COLS];
-    int poles_sizes[MAX_ROWS];
-    int poles_rows = 0;
-
+    // --- Poles ---
+    rows = 0;
     f = fopen("poles.txt", "r");
     if (!f) { perror("poles.txt"); exit(1); }
     while (fgets(line, sizeof(line), f)) {
-        if (line[0] == '#') continue; // skip comment lines
-        poles_sizes[poles_rows] = parse_line(line, poles[poles_rows], MAX_COLS);
-        poles_rows++;
-        if (poles_rows >= MAX_ROWS) break;
+        if (line[0] == '#') continue;
+        parse_line(line, poles[rows], MAX_COLS);
+        rows++;
+        if (rows >= MAX_ROWS) break;
     }
     fclose(f);
 
-    //Flag
-    int flag[MAX_COLS];
-    int flag_size = 0;
-
+    // --- Flag (only first valid line) ---
     f = fopen("flag.txt", "r");
     if (!f) { perror("flag.txt"); exit(1); }
     while (fgets(line, sizeof(line), f)) {
-        if (line[0] == '#') continue; // skip comment lines
-        flag_size = parse_line(line, flag, MAX_COLS);
+        if (line[0] == '#') continue;
+        parse_line(line, flag, MAX_COLS);
         break;
     }
     fclose(f);
 
-    //Seed
-    int seed=0;
-    int seed_size = 0;
-
+    // --- Seed (only first valid value) ---
     f = fopen("seed.txt", "r");
     if (!f) { perror("seed.txt"); exit(1); }
     while (fgets(line, sizeof(line), f)) {
-        if (line[0] == '#') continue; // skip comment lines
-        int temp[MAX_COLS];        // temporary array to parse
-        int count = parse_line(line, temp, MAX_COLS);
-        seed = temp[0];
+        if (line[0] == '#') continue;
+        int temp[MAX_COLS];
+        if (parse_line(line, temp, MAX_COLS) > 0) {
+            *seed = temp[0]; // update caller’s seed
+        }
         break;
     }
     fclose(f);
 }
 
+
+void applywalls(int Maze[3][10][25], int walls[MAX_ROWS][MAX_COLS]) {
+    FILE *f = fopen("walls.txt", "r");
+    if (!f) {
+        perror("walls.txt");
+        return;
+    }
+
+    char line[MAX_LINE];
+    int walls_rows = 0;
+
+    while (fgets(line, sizeof(line), f)) {
+        // Skip empty lines or comment lines starting with #
+        if (line[0] == '#' || line[0] == '\n') {
+            continue;
+        }
+        walls_rows++;
+    }
+
+    fclose(f);
+
+   for (int r = 0; r < walls_rows; r++) {
+    int z  = walls[r][0];  // floor
+    int x1 = walls[r][1];  // start row
+    int y1 = walls[r][2];  // start column
+    int x2 = walls[r][3];  // end row
+    int y2 = walls[r][4];  // end column
+
+    if (x1 == x2 && y1 != y2) {
+        // same row → zero columns from y1 to y2
+        int start, end;
+        if (y1 < y2) {
+            start = y1;
+            end = y2;
+        } else {
+            start = y2;
+            end = y1;
+        }
+
+        for (int c = start; c <= end; c++) {
+            Maze[z][x1][c] = 0;
+        }
+        } 
+        else if (y1 == y2 && x1 != x2) {
+            // same column → zero rows from x1 to x2
+            int start, end;
+            if (x1 < x2) {
+                start = x1;
+                end = x2;
+            } else {
+                start = x2;
+                end = x1;
+            }
+
+            for (int row = start; row <= end; row++) {
+                Maze[z][row][y1] = 0;
+            }
+        } 
+        else if (x1 == x2 && y1 == y2) {
+            // single cell → zero that cell
+            Maze[z][x1][y1] = 0;
+        } 
+        else {
+            // diagonal or irregular line → skip or warn
+            printf("Warning: diagonal wall skipped at record %d\n", r);
+        }
+    }
+
+}
+
+void printMaze(int maze[3][10][25]) {
+    for (int f = 0; f < 3; f++) {
+        printf("Floor %d:\n", f);
+        for (int r = 0; r < 10; r++) {
+            for (int c = 0; c < 25; c++) {
+                printf("%d ", maze[f][r][c]);
+            }
+            printf("\n");
+        }
+        printf("\n");
+    }
+}
+
 int main(){
+    int walls[MAX_ROWS][MAX_COLS];
+    int stairs[MAX_ROWS][MAX_COLS];
+    int poles[MAX_ROWS][MAX_COLS];
+    int flag[MAX_COLS];
+    int seed;
+    // Now you can use walls, stairs, poles, flag, and seed in your program
     int Maze[3][10][25] = {  //blocks=1 , spaces = 0
         {
             {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
@@ -143,5 +219,10 @@ int main(){
             {0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0}
         }
     };
+
+    read_text_files(walls, stairs, poles, flag, &seed);
+    printMaze(Maze);
+    applywalls(Maze, walls);
+    printMaze(Maze);
     return 0;
 }
