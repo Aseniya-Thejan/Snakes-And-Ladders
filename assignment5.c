@@ -7,6 +7,17 @@
 #define MAX_ROWS 20      // maximum number of rows per file
 #define MAX_COLS 20      // maximum numbers per row
 
+typedef struct {
+        char name;       // Player name: 'A', 'B', 'C'
+        int floor;       // Current floor (0 = first floor, 1 = second, etc.)
+        int widthBlock;  // Current position in width (column) in blocks
+        int lengthBlock; // Current position in length (row) in blocks
+        int movementDirection; // 2=north, 3=east, 4=south, 5=west
+        int movePoints;  // Remaining movement points
+        int movementDiceCount;
+        int roundNo;
+    } Player;
+
 // Helper: parse [1,2,3] format into array
 int parse_line(char line[], int arr[], int max) {
     int count = 0, num = 0, in_number = 0;
@@ -361,6 +372,37 @@ void cut_stairs_through_floor2(int Maze[3][10][25], int stairs[MAX_ROWS][MAX_COL
     }
 }
 
+// Roll a dice from 1 to max
+int rollDice(int max) {
+    return (rand() % max) + 1;
+}
+
+Player rollMovementDice(Player p) {
+    // Increment round number
+    p.roundNo++;
+
+    // Roll movement dice
+    int movement = rollDice(6);
+    p.movePoints -= movement;
+
+    p.movementDiceCount++;
+
+    // Every 4th movement dice roll, roll direction dice
+    if (p.movementDiceCount % 4 == 0) {
+        int dirDice = rollDice(6);
+
+        switch (dirDice) {
+            case 2: p.movementDirection = 2; break; // North
+            case 3: p.movementDirection = 3; break; // East
+            case 4: p.movementDirection = 4; break; // South
+            case 5: p.movementDirection = 5; break; // West
+            case 1: case 6: /* empty → keep previous direction */ break;
+        }
+    }
+
+    return p;
+}
+
 int main(){
     int walls[MAX_ROWS][MAX_COLS];
     int stairs[MAX_ROWS][MAX_COLS];
@@ -368,7 +410,12 @@ int main(){
     int flag[MAX_COLS];
     srand(time(NULL));
     int seed;
-    // Now you can use walls, stairs, poles, flag, and seed in your program
+
+    Player playerA = {'A', 0, 6, 12, 2, 100,0,0}; // 2 = North
+    Player playerB = {'B', 0, 9, 8, 5, 100,0,0};  // 5 = west
+    Player playerC = {'C', 0, 9, 16, 3, 100,0,0}; // 3 = east
+
+// Now you can use walls, stairs, poles, flag, and seed in your program
     int Maze[3][10][25] = {  //blocks=1 , spaces = 0
         {
             {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
